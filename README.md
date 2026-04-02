@@ -17,6 +17,7 @@ This project is a rule-based expert system for home-user computer maintenance. I
 ├── expert_system
 │   ├── __init__.py
 │   ├── engine.py
+|   ├── i18n.py
 │   ├── knowledge_base.py
 │   ├── models.py
 │   └── ui.py
@@ -45,9 +46,3 @@ The current knowledge base includes:
 
 - Hardware: power, boot, display, overheating, peripheral, and port issues
 - Software: performance, network, application, security, login, and update issues
-
-You can extend the system by:
-
-- adding new `Question` entries in `expert_system/knowledge_base.py`
-- adding new `Rule` objects that conclude new diagnoses
-- adding new `Diagnosis` descriptions and linking them to new symptom paths
