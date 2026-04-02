@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="status-strip">{{ status_message }}</div>
+
+<section class="app-body">
+  <aside class="sidebar-card">
+    <form method="post" action="{{ url_for('start_diagnosis') }}" class="sidebar-form" id="setup-form">
+      <div class="section-title">{{ t("Diagnosis Setup") }}</div>
+
+      <label class="field-caption">{{ t("Language") }}</label>
+      <div class="inline-options">
+        <a class="pill-link {% if language == 'en' %}active{% endif %}" href="{{ url_for('set_language', lang='en', next=next_path) }}">{{ t("English") }}</a>
+        <a class="pill-link {% if language == 'fr' %}active{% endif %}" href="{{ url_for('set_language', lang='fr', next=next_path) }}">{{ t("French") }}</a>
+      </div>
+
+      <label class="field-caption">{{ t("1. Pick the broad issue type.") }}</label>
+      <div class="stack-options">
+        <label class="radio-line">
+          <input type="radio" name="category" value="hardware" {% if selected_category == "hardware" %}checked{% endif %}>
+          <span>{{ category_label("hardware") }}</span>
+        </label>
+        <label class="radio-line">
+          <input type="radio" name="category" value="software" {% if selected_category == "software" %}checked{% endif %}>
+          <span>{{ category_label("software") }}</span>
+        </label>
+      </div>
+
+      <label class="field-caption">{{ t("2. Select the computer type.") }}</label>
+      <div class="inline-options">
+        <label class="radio-pill">
+          <input type="radio" name="device_type" value="laptop" {% if selected_device == "laptop" %}checked{% endif %}>
+          <span>{{ device_label("laptop") }}</span>
+        </label>
+        <label class="radio-pill">
+          <input type="radio" name="device_type" value="desktop" {% if selected_device == "desktop" %}checked{% endif %}>
+          <span>{{ device_label("desktop") }}</span>
+        </label>
+        <label class="radio-pill">
+          <input type="radio" name="device_type" value="unknown" {% if selected_device == "unknown" %}checked{% endif %}>
+          <span>{{ device_label("unknown") }}</span>
+        </label>
+      </div>
+
+      <label class="field-caption">{{ t("3. Choose the closest symptom path.") }}</label>
+      <div class="symptom-frame">
+        {% for category, symptom_paths in symptom_paths_by_category.items() %}
+          <div class="path-group" data-category="{{ category }}">
+            {% for path in symptom_paths %}
+              <label class="path-option">
+                <input type="radio" name="symptom_path_id" value="{{ path.id }}" {% if selected_path_id == path.id %}checked{% endif %}>
+                <span>{{ t(path.label) }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="path-description">{{ selected_path_description }}</div>
+
+      <div class="action-row">
+        <button class="accent-button" type="submit">{{ t("Start Diagnosis") }}</button>
+        <a class="secondary-button" href="{{ url_for('restart') }}">{{ t("Reset") }}</a>
+      </div>
+    </form>
+  </aside>
+
+  <section class="content-area">
+    <div class="question-card">
+      <div class="section-title">{{ t("Current Prompt") }}</div>
+      <div class="prompt-text">{{ question_text }}</div>
+      <div class="prompt-help">{{ help_text }}</div>
+
+      <form method="post" action="{{ url_for('answer_question') }}" class="answer-row">
+        <button class="answer-button" type="submit" name="answer" value="yes" {% if not answer_enabled %}disabled{% endif %}>{{ t("Yes") }}</button>
+        <button class="answer-button" type="submit" name="answer" value="no" {% if not answer_enabled %}disabled{% endif %}>{{ t("No") }}</button>
+        <button class="answer-button" type="submit" name="answer" value="unknown" {% if not answer_enabled %}disabled{% endif %}>{{ t("Not sure") }}</button>
+      </form>
+    </div>
+
+    <div class="notebook-card">
+      <div class="tab-row">
+        <button class="tab-button active" data-tab-target="outcome-panel" type="button">{{ t("Outcome") }}</button>
+        <button class="tab-button" data-tab-target="reasoning-panel" type="button">{{ t("Reasoning") }}</button>
+      </div>
+
+      <div class="tab-panel active" id="outcome-panel">
+        <pre class="console-text">{{ outcome_text }}</pre>
+      </div>
+      <div class="tab-panel" id="reasoning-panel">
+        <pre class="console-text">{{ reasoning_text }}</pre>
+      </div>
+    </div>
+  </section>
+</section>
+
+<script>
+  const categoryInputs = document.querySelectorAll('input[name="category"]');
+  const pathGroups = document.querySelectorAll('.path-group');
+  const pathDescriptions = {{ path_descriptions | tojson }};
+  const descriptionNode = document.querySelector('.path-description');
+
+  function syncPathGroups() {
+    const activeCategory = document.querySelector('input[name="category"]:checked')?.value || 'hardware';
+    pathGroups.forEach((group) => {
+      const isActive = group.dataset.category === activeCategory;
+      group.hidden = !isActive;
+      group.querySelectorAll('input[name="symptom_path_id"]').forEach((input) => {
+        input.disabled = !isActive;
+      });
+    });
+
+    const checkedVisible = document.querySelector('.path-group:not([hidden]) input[name="symptom_path_id"]:checked');
+    if (!checkedVisible) {
+      const firstVisible = document.querySelector('.path-group:not([hidden]) input[name="symptom_path_id"]');
+      if (firstVisible) {
+        firstVisible.checked = true;
+      }
+    }
+    syncPathDescription();
+  }
+
+  function syncPathDescription() {
+    const selectedPath = document.querySelector('input[name="symptom_path_id"]:checked');
+    descriptionNode.textContent = selectedPath ? pathDescriptions[selectedPath.value] || '' : '';
+  }
+
+  categoryInputs.forEach((input) => input.addEventListener('change', syncPathGroups));
+  document.querySelectorAll('input[name="symptom_path_id"]').forEach((input) => {
+    input.addEventListener('change', syncPathDescription);
+  });
+  syncPathGroups();
+
+  const tabButtons = document.querySelectorAll('.tab-button');
+  const tabPanels = document.querySelectorAll('.tab-panel');
+  tabButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      tabButtons.forEach((item) => item.classList.remove('active'));
+      tabPanels.forEach((panel) => panel.classList.remove('active'));
+      button.classList.add('active');
+      document.getElementById(button.dataset.tabTarget).classList.add('active');
+    });
+  });
+</script>
+{% endblock %}

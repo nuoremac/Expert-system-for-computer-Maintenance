@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="{{ language }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page_title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="app-header">
+      <h1>{{ t("Computer Maintenance Expert System") }}</h1>
+      <p>{{ t("Hardware and software diagnosis") }}</p>
+    </header>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <section class="flash-stack">
+          {% for message in messages %}
+            <div class="flash-card">{{ message }}</div>
+          {% endfor %}
+        </section>
+      {% endif %}
+    {% endwith %}
+
+    <main class="app-main">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>

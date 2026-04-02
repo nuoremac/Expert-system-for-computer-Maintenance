@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="two-column">
+  <article class="panel-card emphasis-card">
+    <span class="section-tag">
+      {% if diagnosis %}
+        {{ t("Diagnosis completed. The engine proved one candidate goal.") }}
+      {% else %}
+        {{ t("Diagnosis status: unresolved") }}
+      {% endif %}
+    </span>
+
+    {% if diagnosis %}
+      <h2>{{ t(diagnosis.title) }}</h2>
+      <p class="lead-text">{{ t(diagnosis.summary) }}</p>
+
+      {% if supporting_rule %}
+        <div class="evidence-card">
+          <h3>{{ t("Supporting rule") }}</h3>
+          <p>{{ t(supporting_rule.explanation) }}</p>
+        </div>
+      {% endif %}
+
+      {% if supporting_facts %}
+        <div class="result-block">
+          <h3>{{ t("Evidence used:") }}</h3>
+          <ul class="fact-list">
+            {% for fact in supporting_facts %}
+              <li>{{ t(fact.prompt) }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+      <div class="result-block">
+        <h3>{{ t("Safe actions:") }}</h3>
+        <ol class="action-list">
+          {% for item in diagnosis.recommendations %}
+            <li>{{ t(item) }}</li>
+          {% endfor %}
+        </ol>
+      </div>
+
+      <div class="result-block warning-block">
+        <h3>{{ t("Escalate when:") }}</h3>
+        <ol class="action-list">
+          {% for item in diagnosis.escalation %}
+            <li>{{ t(item) }}</li>
+          {% endfor %}
+        </ol>
+      </div>
+    {% else %}
+      <h2>{{ t("No rule was fully proved") }}</h2>
+      <p class="lead-text">{{ t(unresolved_message) }}</p>
+      <div class="result-block">
+        <h3>{{ t("Recommended next steps:") }}</h3>
+        <ul class="action-list plain-list">
+          <li>{{ t("1. Start a new session and pick a more specific symptom path if one fits better.") }}</li>
+          <li>{{ t("2. Keep a note of the exact error messages, beep codes, or timing of the failure.") }}</li>
+          <li>{{ t("3. If the system shows burning smells, repeated crashes, or data-loss risk, stop using it and escalate.") }}</li>
+        </ul>
+      </div>
+    {% endif %}
+
+    <div class="button-row">
+      <a class="primary-button" href="{{ url_for('restart') }}">{{ t("Start a new diagnosis") }}</a>
+      <a class="secondary-button" href="{{ url_for('home') }}">{{ t("Back to setup") }}</a>
+    </div>
+  </article>
+
+  <aside class="sidebar-stack">
+    <section class="panel-card">
+      <span class="section-tag">{{ t("Session summary") }}</span>
+      <h3>{{ t(symptom_path.label) }}</h3>
+      <dl class="summary-list">
+        <div>
+          <dt>{{ t("Category") }}</dt>
+          <dd>{{ category_label(symptom_path.category) }}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="panel-card">
+      <span class="section-tag">{{ t("Reasoning trace") }}</span>
+      <h3>{{ t("Known facts") }}</h3>
+      {% if known_facts %}
+        <ul class="fact-list">
+          {% for prompt, answer_label in known_facts %}
+            <li>
+              <span>{{ prompt }}</span>
+              <strong>{{ answer_label }}</strong>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted-text">{{ t("No facts collected yet.") }}</p>
+      {% endif %}
+    </section>
+  </aside>
+</section>
+{% endblock %}

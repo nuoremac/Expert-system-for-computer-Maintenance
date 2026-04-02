@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="two-column">
+  <article class="hero-card">
+    <span class="section-tag">{{ t("Web diagnosis flow") }}</span>
+    <h2>{{ t("Start a diagnosis") }}</h2>
+    <p class="hero-copy">
+      {{ t("Choose a troubleshooting entry point and let the rule engine work backward from the diagnosis goals.") }}
+    </p>
+    <div class="hero-grid">
+      <div class="mini-card">
+        <h3>{{ t("1. Pick the broad issue type.") }}</h3>
+        <p>{{ t("Select the broad family of the problem before choosing a symptom path.") }}</p>
+      </div>
+      <div class="mini-card">
+        <h3>{{ t("2. Select the computer type.") }}</h3>
+        <p>{{ t("Laptop and desktop choices preload known facts and reduce unnecessary questions.") }}</p>
+      </div>
+      <div class="mini-card">
+        <h3>{{ t("3. Choose the closest symptom path.") }}</h3>
+        <p>{{ t("The engine will ask only for facts needed by the active backward-chaining path.") }}</p>
+      </div>
+    </div>
+  </article>
+
+  <section class="panel-card">
+    <form method="post" action="{{ url_for('start_diagnosis') }}" class="stack-form" id="setup-form">
+      <div class="field-block">
+        <label class="field-label">{{ t("Category") }}</label>
+        <div class="choice-row">
+          <label class="choice-pill">
+            <input type="radio" name="category" value="hardware" {% if selected_category == "hardware" %}checked{% endif %}>
+            <span>{{ category_label("hardware") }}</span>
+          </label>
+          <label class="choice-pill">
+            <input type="radio" name="category" value="software" {% if selected_category == "software" %}checked{% endif %}>
+            <span>{{ category_label("software") }}</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="field-block">
+        <label class="field-label">{{ t("Device type") }}</label>
+        <div class="choice-row three-up">
+          <label class="choice-pill">
+            <input type="radio" name="device_type" value="laptop" {% if selected_device == "laptop" %}checked{% endif %}>
+            <span>{{ device_label("laptop") }}</span>
+          </label>
+          <label class="choice-pill">
+            <input type="radio" name="device_type" value="desktop" {% if selected_device == "desktop" %}checked{% endif %}>
+            <span>{{ device_label("desktop") }}</span>
+          </label>
+          <label class="choice-pill">
+            <input type="radio" name="device_type" value="unknown" {% if selected_device == "unknown" %}checked{% endif %}>
+            <span>{{ device_label("unknown") }}</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="field-block">
+        <label class="field-label">{{ t("Symptom path") }}</label>
+        <p class="field-help">{{ t("Select one symptom path to continue.") }}</p>
+        <div class="path-stack" id="path-stack">
+          {% for category, symptom_paths in symptom_paths_by_category.items() %}
+            <div class="path-group" data-category="{{ category }}">
+              {% for path in symptom_paths %}
+                <label class="path-card">
+                  <input type="radio" name="symptom_path_id" value="{{ path.id }}" {% if selected_path_id == path.id %}checked{% endif %}>
+                  <span class="path-title">{{ t(path.label) }}</span>
+                  <span class="path-description">{{ t(path.description) }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <button class="primary-button" type="submit">{{ t("Begin interview") }}</button>
+    </form>
+  </section>
+</section>
+
+<script>
+  const categoryInputs = document.querySelectorAll('input[name="category"]');
+  const pathGroups = document.querySelectorAll('.path-group');
+
+  function syncPathGroups() {
+    const activeCategory = document.querySelector('input[name="category"]:checked')?.value || 'hardware';
+    pathGroups.forEach((group) => {
+      const isActive = group.dataset.category === activeCategory;
+      group.hidden = !isActive;
+      group.querySelectorAll('input[name="symptom_path_id"]').forEach((input) => {
+        input.disabled = !isActive;
+      });
+    });
+
+    const visibleChecked = document.querySelector('.path-group:not([hidden]) input[name="symptom_path_id"]:checked');
+    if (!visibleChecked) {
+      const firstVisible = document.querySelector('.path-group:not([hidden]) input[name="symptom_path_id"]');
+      if (firstVisible) {
+        firstVisible.checked = true;
+      }
+    }
+  }
+
+  categoryInputs.forEach((input) => input.addEventListener('change', syncPathGroups));
+  syncPathGroups();
+</script>
+{% endblock %}
