@@ -36,7 +36,7 @@ def create_app() -> Flask:
 
     @app.get("/")
     def home() -> str:
-        flow = load_flow()
+        flow = empty_flow()
         return render_dashboard(flow, request.path)
 
     @app.post("/start")
@@ -122,7 +122,7 @@ def render_dashboard(flow: dict[str, Any], next_path: str) -> str:
         "Choose the issue category, pick the closest symptom, then start the diagnosis.",
         current_language(),
     )
-    question_text = translate("The backward-chaining interview will appear here.", current_language())
+    question_text = translate("The next question will appear here.", current_language())
     help_text = translate("No active session yet.", current_language())
     outcome_text = translate(
         "No diagnosis yet.\n\nStart a session from the left panel to let the engine work backward from a chosen symptom.",
@@ -220,13 +220,7 @@ def selected_symptom_path(flow: dict[str, Any]):
 def load_flow() -> dict[str, Any]:
     flow = session.get("diagnosis_flow")
     if not isinstance(flow, dict):
-        return {
-            "category": "hardware",
-            "device_type": "unknown",
-            "symptom_path_id": None,
-            "answers": {},
-            "answer_order": [],
-        }
+        return empty_flow()
 
     category = flow.get("category", "hardware")
     if category not in CATEGORY_LABELS:
@@ -249,6 +243,16 @@ def load_flow() -> dict[str, Any]:
         "answer_order": list(flow.get("answer_order", [])),
     }
     return normalized
+
+
+def empty_flow() -> dict[str, Any]:
+    return {
+        "category": "hardware",
+        "device_type": "unknown",
+        "symptom_path_id": None,
+        "answers": {},
+        "answer_order": [],
+    }
 
 
 def save_flow(flow: dict[str, Any]) -> None:

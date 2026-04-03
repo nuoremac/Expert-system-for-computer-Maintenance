@@ -410,7 +410,7 @@ class ExpertSystemApp(ttk.Frame):
         self.device_laptop_button.configure(text=self._t("Laptop"))
         self.device_desktop_button.configure(text=self._t("Desktop"))
         self.device_unknown_button.configure(text=self._t("Not sure"))
-        self.symptom_label.configure(text=self._t("3. Choose the closest symptom path."))
+        self.symptom_label.configure(text=self._t("3. What is the issue?"))
         self.start_button.configure(text=self._t("Start Diagnosis"))
         self.reset_button.configure(text=self._t("Reset"))
         self.current_prompt_label.configure(text=self._t("Current Prompt"))
@@ -464,7 +464,7 @@ class ExpertSystemApp(ttk.Frame):
             self.status_var.set(
                 self._t("Choose the issue category, pick the closest symptom, then start the diagnosis.")
             )
-            self.question_var.set(self._t("The backward-chaining interview will appear here."))
+            self.question_var.set(self._t("The next question will appear here."))
             self.help_var.set(self._t("No active session yet."))
             self._set_answer_buttons_state(tk.DISABLED)
             self._set_text(
@@ -515,7 +515,7 @@ class ExpertSystemApp(ttk.Frame):
                 label=self._t(self.session.symptom_path.label),
             )
         )
-        self.question_var.set(self._t("The backward-chaining interview will appear here."))
+        self.question_var.set(self._t("The next question will appear here."))
         self.help_var.set(self._t("No active session yet."))
         self._set_answer_buttons_state(tk.DISABLED)
         self._set_text(self.outcome_text, self._format_session_overview())
@@ -564,7 +564,7 @@ class ExpertSystemApp(ttk.Frame):
         self.status_var.set(
             self._t("Choose the issue category, pick the closest symptom, then start the diagnosis.")
         )
-        self.question_var.set(self._t("The backward-chaining interview will appear here."))
+        self.question_var.set(self._t("The next question will appear here."))
         self.help_var.set(self._t("No active session yet."))
         self._set_answer_buttons_state(tk.DISABLED)
         self._set_text(

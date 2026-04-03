@@ -825,7 +825,7 @@ def build_knowledge_base() -> KnowledgeBase:
             id="software_performance",
             category="software",
             label="System is slow or freezes",
-            description="Use this path for sluggish performance, long startup, or light-use freezes.",
+            description="",
             goals=("low_storage_problem", "startup_overload", "malware_problem"),
         ),
         SymptomPath(
