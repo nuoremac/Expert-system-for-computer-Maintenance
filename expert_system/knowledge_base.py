@@ -790,7 +790,7 @@ def build_knowledge_base() -> KnowledgeBase:
             id="hardware_power",
             category="hardware",
             label="Computer does not turn on",
-            description="Use this path when the PC shows no normal power response at all.",
+            description="",
             goals=("wall_outlet_problem", "charger_or_battery_problem", "internal_power_issue"),
         ),
         SymptomPath(

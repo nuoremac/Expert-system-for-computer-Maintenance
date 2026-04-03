@@ -117,6 +117,7 @@ def create_app() -> Flask:
 
 def render_dashboard(flow: dict[str, Any], next_path: str) -> str:
     selected_path = selected_symptom_path(flow)
+    visible_paths = ENGINE.symptom_paths_for_category(flow["category"])
     status_message = translate(
         "Choose the issue category, pick the closest symptom, then start the diagnosis.",
         current_language(),
@@ -127,7 +128,6 @@ def render_dashboard(flow: dict[str, Any], next_path: str) -> str:
         "No diagnosis yet.\n\nStart a session from the left panel to let the engine work backward from a chosen symptom.",
         current_language(),
     )
-    reasoning_text = translate("No facts collected yet.", current_language())
     answer_enabled = False
 
     if selected_path is not None:
@@ -136,17 +136,16 @@ def render_dashboard(flow: dict[str, Any], next_path: str) -> str:
 
         if isinstance(outcome, QuestionOutcome):
             status_message = translate(
-                "A supporting fact is needed to continue the backward-chaining proof.",
+                "Please answer the next question to continue.",
                 current_language(),
             )
             question_text = translate(outcome.question.prompt, current_language())
             help_text = translate(outcome.question.help_text or "Answer with the closest choice.", current_language())
             outcome_text = format_session_overview(expert_session)
-            reasoning_text = format_reasoning_text(expert_session)
             answer_enabled = True
         elif isinstance(outcome, DiagnosisOutcome):
             status_message = translate(
-                "Diagnosis completed. The engine proved one candidate goal.",
+                "Diagnosis completed.",
                 current_language(),
             )
             question_text = translate(outcome.diagnosis.title, current_language())
@@ -155,7 +154,6 @@ def render_dashboard(flow: dict[str, Any], next_path: str) -> str:
                 current_language(),
             )
             outcome_text = format_diagnosis_text(outcome)
-            reasoning_text = format_reasoning_text(expert_session)
         else:
             status_message = translate(
                 "The current rules did not produce a confident diagnosis.",
@@ -164,7 +162,6 @@ def render_dashboard(flow: dict[str, Any], next_path: str) -> str:
             question_text = translate("No rule was fully proved", current_language())
             help_text = translate("Try another symptom path if the current one is too broad.", current_language())
             outcome_text = format_unresolved_text(outcome)
-            reasoning_text = format_reasoning_text(expert_session)
 
     return render_template(
         "dashboard.html",
@@ -173,20 +170,22 @@ def render_dashboard(flow: dict[str, Any], next_path: str) -> str:
         selected_device=flow["device_type"],
         selected_path_id=flow["symptom_path_id"],
         selected_path_description=translate(selected_path.description, current_language()) if selected_path else "",
-        path_descriptions={
-            path.id: translate(path.description, current_language())
-            for category in ("hardware", "software")
-            for path in ENGINE.symptom_paths_for_category(category)
-        },
-        symptom_paths_by_category={
-            category: ENGINE.symptom_paths_for_category(category)
+        symptom_paths=visible_paths,
+        symptom_paths_json={
+            category: [
+                {
+                    "id": path.id,
+                    "label": translate(path.label, current_language()),
+                    "description": translate(path.description, current_language()),
+                }
+                for path in ENGINE.symptom_paths_for_category(category)
+            ]
             for category in ("hardware", "software")
         },
         status_message=status_message,
         question_text=question_text,
         help_text=help_text,
         outcome_text=outcome_text,
-        reasoning_text=reasoning_text,
         answer_enabled=answer_enabled,
         next_path=next_path,
     )
@@ -229,10 +228,23 @@ def load_flow() -> dict[str, Any]:
             "answer_order": [],
         }
 
+    category = flow.get("category", "hardware")
+    if category not in CATEGORY_LABELS:
+        category = "hardware"
+
+    device_type = flow.get("device_type", "unknown")
+    if device_type not in DEVICE_LABELS:
+        device_type = "unknown"
+
+    symptom_path_id = flow.get("symptom_path_id")
+    symptom_path = ENGINE.symptom_paths_by_id.get(symptom_path_id)
+    if symptom_path is None or symptom_path.category != category:
+        symptom_path_id = None
+
     normalized = {
-        "category": flow.get("category", "hardware"),
-        "device_type": flow.get("device_type", "unknown"),
-        "symptom_path_id": flow.get("symptom_path_id"),
+        "category": category,
+        "device_type": device_type,
+        "symptom_path_id": symptom_path_id,
         "answers": dict(flow.get("answers", {})),
         "answer_order": list(flow.get("answer_order", [])),
     }
@@ -261,25 +273,6 @@ def build_session(flow: dict[str, Any]) -> ExpertSession:
     return expert_session
 
 
-def format_known_facts(expert_session: ExpertSession) -> list[tuple[str, str]]:
-    formatted: list[tuple[str, str]] = []
-    for fact in expert_session.answer_order:
-        if fact in KNOWLEDGE_BASE.questions:
-            prompt = translate(KNOWLEDGE_BASE.questions[fact].prompt, current_language())
-        else:
-            prompt = fact.replace("_", " ").capitalize()
-
-        answer = expert_session.answers[fact]
-        if answer is True:
-            answer_label = translate("Yes", current_language())
-        elif answer is False:
-            answer_label = translate("No", current_language())
-        else:
-            answer_label = translate("Not sure", current_language())
-        formatted.append((prompt, answer_label))
-    return formatted
-
-
 def format_session_overview(expert_session: ExpertSession) -> str:
     return translate(
         "Symptom path: {label}\nCategory: {category}\n\nThe system is evaluating candidate diagnoses.",
@@ -291,37 +284,22 @@ def format_session_overview(expert_session: ExpertSession) -> str:
 
 def format_diagnosis_text(outcome: DiagnosisOutcome) -> str:
     lines = [
-        translate("Diagnosis: {title}", current_language(), title=translate(outcome.diagnosis.title, current_language())),
-        translate(
-            "Category: {category}",
-            current_language(),
-            category=category_label(outcome.diagnosis.category),
-        ),
+        translate("Diagnosis", current_language()),
+        translate(outcome.diagnosis.title, current_language()),
         "",
-        translate(outcome.diagnosis.summary, current_language()),
-        "",
-        translate(
-            "Why this rule matched: {explanation}",
-            current_language(),
-            explanation=translate(outcome.rule.explanation, current_language()),
-        ),
+        translate("Simple explanation", current_language()),
+        format_simple_explanation(outcome),
     ]
 
-    if outcome.supporting_facts:
-        lines.append("")
-        lines.append(translate("Evidence used:", current_language()))
-        for fact in outcome.supporting_facts:
-            lines.append(f"- {fact_label(fact)}")
-
     lines.append("")
-    lines.append(translate("Safe actions:", current_language()))
+    lines.append(translate("Safe actions", current_language()))
     for index, recommendation in enumerate(outcome.diagnosis.recommendations, start=1):
         lines.append(f"{index}. {translate(recommendation, current_language())}")
 
     lines.append("")
-    lines.append(translate("Escalate when:", current_language()))
-    for index, item in enumerate(outcome.diagnosis.escalation, start=1):
-        lines.append(f"{index}. {translate(item, current_language())}")
+    lines.append(translate("Contact a technician:", current_language()))
+    for item in outcome.diagnosis.escalation:
+        lines.append(f"- {format_escalation_item(item)}")
 
     return "\n".join(lines)
 
@@ -336,44 +314,52 @@ def format_unresolved_text(outcome: UnresolvedOutcome) -> str:
         translate("1. Start a new session and pick a more specific symptom path if one fits better.", current_language()),
         translate("2. Keep a note of the exact error messages, beep codes, or timing of the failure.", current_language()),
         translate(
-            "3. If the system shows burning smells, repeated crashes, or data-loss risk, stop using it and escalate.",
+            "3. If the system shows burning smells, repeated crashes, or data-loss risk, stop using it and contact a technician.",
             current_language(),
         ),
     ]
     return "\n".join(lines)
 
 
-def format_reasoning_text(expert_session: ExpertSession) -> str:
-    if not expert_session.answer_order:
-        return translate("No facts collected yet.", current_language())
-
-    lines = [
-        translate(
-            "Symptom path: {label}",
-            current_language(),
-            label=translate(expert_session.symptom_path.label, current_language()),
-        ),
-        "",
-        translate("Collected facts:", current_language()),
-    ]
-    for fact in expert_session.answer_order:
-        lines.append(f"- {fact_label(fact)} -> {answer_label(expert_session.answers[fact])}")
-    return "\n".join(lines)
+def format_simple_explanation(outcome: DiagnosisOutcome) -> str:
+    summary = translate(outcome.diagnosis.summary, current_language())
+    explanation = translate(outcome.rule.explanation, current_language())
+    if explanation.rstrip(".") == summary.rstrip("."):
+        return summary
+    return f"{explanation} {summary}"
 
 
-def fact_label(fact: str) -> str:
-    question = KNOWLEDGE_BASE.questions.get(fact)
-    if question is not None:
-        return translate(question.prompt, current_language())
-    return translate(fact.replace("_", " ").capitalize(), current_language())
+def format_escalation_item(item: str) -> str:
+    rendered = translate(item, current_language())
 
+    if current_language() == "fr":
+        replacements = (
+            ("Escaladez immediatement si ", "immediatement si "),
+            ("Escaladez rapidement si ", "rapidement si "),
+            ("Escaladez vers un technicien pour ", "pour "),
+            ("Escaladez vers votre fournisseur d'acces si ", "si "),
+            ("Escaladez pour ", "pour "),
+            ("Escaladez si ", "si "),
+        )
+    else:
+        replacements = (
+            ("Escalate immediately if ", "immediately if "),
+            ("Escalate quickly if ", "promptly if "),
+            ("Escalate to a technician for ", "for "),
+            ("Escalate to your ISP if ", "if "),
+            ("Escalate for ", "for "),
+            ("Escalate if ", "if "),
+        )
 
-def answer_label(answer: FlowAnswer) -> str:
-    if answer is True:
-        return translate("Yes", current_language())
-    if answer is False:
-        return translate("No", current_language())
-    return translate("Not sure", current_language())
+    for source, target in replacements:
+        if rendered.startswith(source):
+            remainder = rendered[len(source):]
+            if source in {"Escalate to your ISP if ", "Escaladez vers votre fournisseur d'acces si "}:
+                if current_language() == "fr":
+                    return f"{target}{remainder}, contactez votre fournisseur d'acces"
+                return f"{target}{remainder}, contact your ISP"
+            return f"{target}{remainder}"
+    return rendered
 
 
 def parse_answer(token: str) -> FlowAnswer | str:

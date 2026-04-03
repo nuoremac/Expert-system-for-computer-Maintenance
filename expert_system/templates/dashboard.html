@@ -43,16 +43,12 @@
       </div>
 
       <label class="field-caption">{{ t("3. Choose the closest symptom path.") }}</label>
-      <div class="symptom-frame">
-        {% for category, symptom_paths in symptom_paths_by_category.items() %}
-          <div class="path-group" data-category="{{ category }}">
-            {% for path in symptom_paths %}
-              <label class="path-option">
-                <input type="radio" name="symptom_path_id" value="{{ path.id }}" {% if selected_path_id == path.id %}checked{% endif %}>
-                <span>{{ t(path.label) }}</span>
-              </label>
-            {% endfor %}
-          </div>
+      <div class="symptom-frame" id="symptom-options">
+        {% for path in symptom_paths %}
+          <label class="path-option">
+            <input type="radio" name="symptom_path_id" value="{{ path.id }}" {% if selected_path_id == path.id %}checked{% endif %}>
+            <span>{{ t(path.label) }}</span>
+          </label>
         {% endfor %}
       </div>
 
@@ -79,16 +75,9 @@
     </div>
 
     <div class="notebook-card">
-      <div class="tab-row">
-        <button class="tab-button active" data-tab-target="outcome-panel" type="button">{{ t("Outcome") }}</button>
-        <button class="tab-button" data-tab-target="reasoning-panel" type="button">{{ t("Reasoning") }}</button>
-      </div>
-
-      <div class="tab-panel active" id="outcome-panel">
+      <div class="section-title">{{ t("Outcome") }}</div>
+      <div class="outcome-panel">
         <pre class="console-text">{{ outcome_text }}</pre>
-      </div>
-      <div class="tab-panel" id="reasoning-panel">
-        <pre class="console-text">{{ reasoning_text }}</pre>
       </div>
     </div>
   </section>
@@ -96,50 +85,54 @@
 
 <script>
   const categoryInputs = document.querySelectorAll('input[name="category"]');
-  const pathGroups = document.querySelectorAll('.path-group');
-  const pathDescriptions = {{ path_descriptions | tojson }};
+  const symptomOptionsNode = document.getElementById('symptom-options');
+  const symptomPaths = {{ symptom_paths_json | tojson }};
   const descriptionNode = document.querySelector('.path-description');
 
-  function syncPathGroups() {
+  function renderPathOptions() {
     const activeCategory = document.querySelector('input[name="category"]:checked')?.value || 'hardware';
-    pathGroups.forEach((group) => {
-      const isActive = group.dataset.category === activeCategory;
-      group.hidden = !isActive;
-      group.querySelectorAll('input[name="symptom_path_id"]').forEach((input) => {
-        input.disabled = !isActive;
-      });
+    const activePaths = symptomPaths[activeCategory] || [];
+    const checkedPath = document.querySelector('input[name="symptom_path_id"]:checked')?.value;
+    const nextSelection = activePaths.some((path) => path.id === checkedPath)
+      ? checkedPath
+      : activePaths[0]?.id;
+
+    symptomOptionsNode.replaceChildren();
+
+    activePaths.forEach((path) => {
+      const label = document.createElement('label');
+      label.className = 'path-option';
+
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = 'symptom_path_id';
+      input.value = path.id;
+      input.checked = path.id === nextSelection;
+      input.addEventListener('change', syncPathDescription);
+
+      const text = document.createElement('span');
+      text.textContent = path.label;
+
+      label.append(input, text);
+      symptomOptionsNode.append(label);
     });
 
-    const checkedVisible = document.querySelector('.path-group:not([hidden]) input[name="symptom_path_id"]:checked');
-    if (!checkedVisible) {
-      const firstVisible = document.querySelector('.path-group:not([hidden]) input[name="symptom_path_id"]');
-      if (firstVisible) {
-        firstVisible.checked = true;
-      }
+    if (!nextSelection) {
+      descriptionNode.textContent = '';
+      return;
     }
     syncPathDescription();
   }
 
   function syncPathDescription() {
-    const selectedPath = document.querySelector('input[name="symptom_path_id"]:checked');
-    descriptionNode.textContent = selectedPath ? pathDescriptions[selectedPath.value] || '' : '';
+    const activeCategory = document.querySelector('input[name="category"]:checked')?.value || 'hardware';
+    const activePaths = symptomPaths[activeCategory] || [];
+    const selectedPathId = document.querySelector('input[name="symptom_path_id"]:checked')?.value;
+    const selectedPath = activePaths.find((path) => path.id === selectedPathId);
+    descriptionNode.textContent = selectedPath ? selectedPath.description || '' : '';
   }
 
-  categoryInputs.forEach((input) => input.addEventListener('change', syncPathGroups));
-  document.querySelectorAll('input[name="symptom_path_id"]').forEach((input) => {
-    input.addEventListener('change', syncPathDescription);
-  });
-  syncPathGroups();
-
-  const tabButtons = document.querySelectorAll('.tab-button');
-  const tabPanels = document.querySelectorAll('.tab-panel');
-  tabButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      tabButtons.forEach((item) => item.classList.remove('active'));
-      tabPanels.forEach((panel) => panel.classList.remove('active'));
-      button.classList.add('active');
-      document.getElementById(button.dataset.tabTarget).classList.add('active');
-    });
-  });
+  categoryInputs.forEach((input) => input.addEventListener('change', renderPathOptions));
+  renderPathOptions();
 </script>
 {% endblock %}

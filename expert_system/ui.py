@@ -479,7 +479,7 @@ class ExpertSystemApp(ttk.Frame):
         if self.session.current_question_id is not None:
             question = KNOWLEDGE_BASE.questions[self.session.current_question_id]
             self.status_var.set(
-                self._t("A supporting fact is needed to continue the backward-chaining proof.")
+                self._t("Please answer the next question to continue.")
             )
             self.question_var.set(self._t(question.prompt))
             help_text = question.help_text or "Answer with the closest choice."
@@ -490,7 +490,7 @@ class ExpertSystemApp(ttk.Frame):
             return
 
         if isinstance(self.last_outcome, DiagnosisOutcome):
-            self.status_var.set(self._t("Diagnosis completed. The engine proved one candidate goal."))
+            self.status_var.set(self._t("Diagnosis completed."))
             self.question_var.set(self._t(self.last_outcome.diagnosis.title))
             self.help_var.set(
                 self._t("A rule matched the selected symptom path. Review the safe steps below.")
@@ -586,7 +586,7 @@ class ExpertSystemApp(ttk.Frame):
             help_text = outcome.question.help_text or "Answer with the closest choice."
             self.help_var.set(self._t(help_text))
             self.status_var.set(
-                self._t("A supporting fact is needed to continue the backward-chaining proof.")
+                self._t("Please answer the next question to continue.")
             )
             self._set_answer_buttons_state(tk.NORMAL)
             self._set_text(self.outcome_text, self._format_session_overview())
@@ -600,7 +600,7 @@ class ExpertSystemApp(ttk.Frame):
             self.help_var.set(
                 self._t("A rule matched the selected symptom path. Review the safe steps below.")
             )
-            self.status_var.set(self._t("Diagnosis completed. The engine proved one candidate goal."))
+            self.status_var.set(self._t("Diagnosis completed."))
             self._set_text(self.outcome_text, self._format_diagnosis(outcome))
         elif isinstance(outcome, UnresolvedOutcome):
             self.last_outcome = outcome
@@ -619,31 +619,31 @@ class ExpertSystemApp(ttk.Frame):
 
     def _format_diagnosis(self, outcome: DiagnosisOutcome) -> str:
         lines = [
-            self._t("Diagnosis: {title}", title=self._t(outcome.diagnosis.title)),
-            self._t("Category: {category}", category=self._category_label(outcome.diagnosis.category)),
+            self._t("Diagnosis"),
+            self._t(outcome.diagnosis.title),
             "",
-            self._t(outcome.diagnosis.summary),
-            "",
-            self._t("Why this rule matched: {explanation}", explanation=self._t(outcome.rule.explanation)),
+            self._t("Simple explanation"),
+            self._format_simple_explanation(outcome),
         ]
 
-        if outcome.supporting_facts:
-            lines.append("")
-            lines.append(self._t("Evidence used:"))
-            for fact in outcome.supporting_facts:
-                lines.append(f"- {self._fact_label(fact)}")
-
         lines.append("")
-        lines.append(self._t("Safe actions:"))
+        lines.append(self._t("Safe actions"))
         for index, recommendation in enumerate(outcome.diagnosis.recommendations, start=1):
             lines.append(f"{index}. {self._t(recommendation)}")
 
         lines.append("")
-        lines.append(self._t("Escalate when:"))
-        for index, item in enumerate(outcome.diagnosis.escalation, start=1):
-            lines.append(f"{index}. {self._t(item)}")
+        lines.append(self._t("Contact a technician:"))
+        for item in outcome.diagnosis.escalation:
+            lines.append(f"- {self._format_escalation_item(item)}")
 
         return "\n".join(lines)
+
+    def _format_simple_explanation(self, outcome: DiagnosisOutcome) -> str:
+        summary = self._t(outcome.diagnosis.summary)
+        explanation = self._t(outcome.rule.explanation)
+        if explanation.rstrip(".") == summary.rstrip("."):
+            return summary
+        return f"{explanation} {summary}"
 
     def _format_unresolved(self, outcome: UnresolvedOutcome) -> str:
         lines = [
@@ -655,10 +655,42 @@ class ExpertSystemApp(ttk.Frame):
             self._t("1. Start a new session and pick a more specific symptom path if one fits better."),
             self._t("2. Keep a note of the exact error messages, beep codes, or timing of the failure."),
             self._t(
-                "3. If the system shows burning smells, repeated crashes, or data-loss risk, stop using it and escalate."
+                "3. If the system shows burning smells, repeated crashes, or data-loss risk, stop using it and contact a technician."
             ),
         ]
         return "\n".join(lines)
+
+    def _format_escalation_item(self, item: str) -> str:
+        rendered = self._t(item)
+
+        if self.language == "fr":
+            replacements = (
+                ("Escaladez immediatement si ", "immediatement si "),
+                ("Escaladez rapidement si ", "rapidement si "),
+                ("Escaladez vers un technicien pour ", "pour "),
+                ("Escaladez vers votre fournisseur d'acces si ", "si "),
+                ("Escaladez pour ", "pour "),
+                ("Escaladez si ", "si "),
+            )
+        else:
+            replacements = (
+                ("Escalate immediately if ", "immediately if "),
+                ("Escalate quickly if ", "promptly if "),
+                ("Escalate to a technician for ", "for "),
+                ("Escalate to your ISP if ", "if "),
+                ("Escalate for ", "for "),
+                ("Escalate if ", "if "),
+            )
+
+        for source, target in replacements:
+            if rendered.startswith(source):
+                remainder = rendered[len(source):]
+                if source in {"Escalate to your ISP if ", "Escaladez vers votre fournisseur d'acces si "}:
+                    if self.language == "fr":
+                        return f"{target}{remainder}, contactez votre fournisseur d'acces"
+                    return f"{target}{remainder}, contact your ISP"
+                return f"{target}{remainder}"
+        return rendered
 
     def _render_reasoning(self) -> None:
         if self.session is None or not self.session.answer_order:

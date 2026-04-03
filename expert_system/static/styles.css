@@ -168,10 +168,6 @@ body {
   overflow: auto;
 }
 
-.path-group {
-  display: grid;
-}
-
 .path-option {
   display: flex;
   align-items: center;
@@ -193,8 +189,7 @@ body {
 
 .accent-button,
 .secondary-button,
-.answer-button,
-.tab-button {
+.answer-button {
   border: 0;
   font: inherit;
 }
@@ -273,35 +268,12 @@ body {
 .notebook-card {
   min-height: 360px;
   display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 0;
-}
-
-.tab-row {
-  display: flex;
-  gap: 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.tab-button {
-  background: transparent;
-  padding: 10px 16px;
-  cursor: pointer;
-  color: var(--header-bg);
-}
-
-.tab-button.active {
-  background: var(--secondary-bg);
-  font-weight: 700;
-}
-
-.tab-panel {
-  display: none;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
   min-height: 0;
 }
 
-.tab-panel.active {
-  display: block;
+.outcome-panel {
   height: 100%;
 }
 
